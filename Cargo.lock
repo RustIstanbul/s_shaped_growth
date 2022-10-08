@@ -2601,6 +2601,7 @@ dependencies = [
  "bevy",
  "bevy_sepax2d",
  "rand",
+ "sepax2d",
 ]
 
 [[package]]

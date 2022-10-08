@@ -8,7 +8,8 @@ edition = "2021"
 [dependencies]
 bevy = { version = "0.8.1", features = ["dynamic"] }
 rand = "0.8.5"
-bevy_sepax2d = "0.3.0"
+sepax2d = "0.3"
+bevy_sepax2d = "0.3"
 
 
 # Enable a small amount of optimization in debug mode
