@@ -1,5 +1,4 @@
-//! Demonstrates rotating entities in 2D using quaternions.
-
+//cargo build --release --target wasm32-unknown-unknown
 use bevy::{
     math::Vec3Swizzles,
     prelude::*,
@@ -40,6 +39,14 @@ struct Hopper {
     belly: f32,
 }
 
+#[derive(Component)]
+struct HopperCount {
+    count: usize,
+    step: usize,
+}
+
+struct UiFont(Handle<Font>);
+
 struct GrassSpawnConfig {
     /// How often to spawn a new grass? (repeating timer)
     timer: Timer,
@@ -47,6 +54,7 @@ struct GrassSpawnConfig {
 
 struct HopperCountConfig {
     timer: Timer,
+    step: usize,
 }
 
 /// Add the game's entities to our world and creates an orthographic camera for 2D rendering.
@@ -64,6 +72,8 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
+    let handle: Handle<Font> = asset_server.load("fonts/NotoSansMono-Regular.ttf");
+
     // 2D orthographic camera
     commands.spawn_bundle(Camera2dBundle::default());
 
@@ -74,6 +84,7 @@ fn setup(
 
     commands.insert_resource(HopperCountConfig {
         timer: Timer::new(Duration::from_secs(1), true),
+        step: 0,
     });
 
     let circle1 = Circle::new((0.0, 0.0), 10.0);
@@ -96,6 +107,11 @@ fn setup(
                 convex: bevy_sepax2d::Convex::Circle(circle1),
             });
     }
+}
+
+fn load_ui_font(mut commands: Commands, server: Res<AssetServer>) {
+    let handle: Handle<Font> = server.load("fonts/NotoSansMono-Regular.ttf");
+    commands.insert_resource(UiFont(handle));
 }
 
 fn spawn_grasses(
@@ -138,6 +154,10 @@ fn spawn_grasses(
 }
 
 fn count_hoppers(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    asset_server: Res<AssetServer>,
     time: Res<Time>,
     mut config: ResMut<HopperCountConfig>,
     hoppers: Query<(&Hopper,)>,
@@ -145,9 +165,52 @@ fn count_hoppers(
     // tick the timer
     config.timer.tick(time.delta());
 
+    let font = asset_server.load("fonts/NotoSansMono-Regular.ttf");
+
     if config.timer.finished() {
+        let text_style = TextStyle {
+            font: font,
+            font_size: 15.0,
+            color: Color::WHITE,
+        };
+
+        config.step += 1;
         let count = hoppers.iter().count();
-        println!("{:?}", count);
+        commands
+            .spawn_bundle(MaterialMesh2dBundle {
+                mesh: meshes
+                    .add(
+                        shape::Quad::new(Vec2 {
+                            x: 10.,
+                            y: count as f32,
+                        })
+                        .into(),
+                    )
+                    .into(),
+                material: materials.add(ColorMaterial::from(Color::RED)),
+                transform: Transform::from_translation(Vec3::new(
+                    config.step as f32 * 20. - BOUNDS.x / 2.,
+                    (count as f32) / 2. - BOUNDS.y / 2.0,
+                    0.,
+                )),
+                ..default()
+            })
+            .insert(HopperCount {
+                count: count,
+                step: config.step,
+            })
+            .with_children(|parent| {
+                parent.spawn_bundle(Text2dBundle {
+                    text: Text::from_section(count.to_string(), text_style.clone())
+                        .with_alignment(TextAlignment::CENTER),
+                        transform: Transform::from_translation(Vec3::new(
+                            0.,
+                            - (count as f32) / 2. - 5.0,
+                            0.,
+                        )),
+                    ..default()
+                });
+            });
     }
 }
 
