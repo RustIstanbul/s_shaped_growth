@@ -24,6 +24,7 @@ fn main() {
             SystemSet::new()
                 .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                 .with_system(spawn_grasses)
+                .with_system(count_hoppers)
                 .with_system(eating_system)
                 .with_system(hopper_movement_system),
         )
@@ -41,6 +42,10 @@ struct Hopper {
 
 struct GrassSpawnConfig {
     /// How often to spawn a new grass? (repeating timer)
+    timer: Timer,
+}
+
+struct HopperCountConfig {
     timer: Timer,
 }
 
@@ -67,6 +72,10 @@ fn setup(
         timer: Timer::new(Duration::from_millis(50), true),
     });
 
+    commands.insert_resource(HopperCountConfig {
+        timer: Timer::new(Duration::from_secs(1), true),
+    });
+
     let circle1 = Circle::new((0.0, 0.0), 10.0);
     for count in 0..1 {
         let random_radian = (360.0_f32 * random::<f32>()).to_radians();
@@ -82,7 +91,7 @@ fn setup(
                 .with_rotation(Quat::from_rotation_z(random_radian)),
                 ..default()
             })
-            .insert(Hopper { belly: 50. })
+            .insert(Hopper { belly: 80. })
             .insert(Sepax {
                 convex: bevy_sepax2d::Convex::Circle(circle1),
             });
@@ -128,6 +137,20 @@ fn spawn_grasses(
     }
 }
 
+fn count_hoppers(
+    time: Res<Time>,
+    mut config: ResMut<HopperCountConfig>,
+    hoppers: Query<(&Hopper,)>,
+) {
+    // tick the timer
+    config.timer.tick(time.delta());
+
+    if config.timer.finished() {
+        let count = hoppers.iter().count();
+        println!("{:?}", count);
+    }
+}
+
 fn eating_system(
     mut commands: Commands,
     mut hoppers: Query<(
@@ -153,6 +176,7 @@ fn eating_system(
 
         if h.belly < 0. {
             commands.entity(hopper_entity).despawn();
+            continue;
         }
 
         let pinkness = 1. - h.belly.min(100.) / 100.;
