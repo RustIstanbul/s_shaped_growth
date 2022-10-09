@@ -127,7 +127,6 @@ fn eating_system(
     for (_h, hs) in hoppers.iter() {
         for (ge, g, gs) in targets.iter() {
             if sat_overlap(hs.shape(), gs.shape()) {
-                println!("{:?}", "grasshopper hit!");
                 commands.entity(ge).despawn();
             }
         }
