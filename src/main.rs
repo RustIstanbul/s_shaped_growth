@@ -19,7 +19,8 @@ fn main() {
             SystemSet::new()
                 .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                 .with_system(spawn_grasses)
-                .with_system(eating_system),
+                .with_system(eating_system)
+                .with_system(hopper_movement_system),
         )
         .add_system(bevy::window::close_on_esc)
         .run();
@@ -59,17 +60,18 @@ fn setup(
         timer: Timer::new(Duration::from_millis(100), true),
     });
 
-    let circle1 = Circle::new((0.0, 0.0), 50.0);
+    let circle1 = Circle::new((0.0, 0.0), 10.0);
 
     commands
         .spawn_bundle(MaterialMesh2dBundle {
-            mesh: meshes.add(shape::Circle::new(50.).into()).into(),
+            mesh: meshes.add(shape::Circle::new(10.).into()).into(),
             material: materials.add(ColorMaterial::from(Color::RED)),
             transform: Transform::from_translation(Vec3::new(
                 random::<f32>() * BOUNDS.x - BOUNDS.x / 2.,
                 random::<f32>() * BOUNDS.y - BOUNDS.y / 2.0,
                 0.,
-            )),
+            ))
+            .with_rotation(Quat::from_rotation_z((20.0_f32).to_radians())),
             ..default()
         })
         .insert(Hopper {})
@@ -117,12 +119,44 @@ fn spawn_grasses(
     }
 }
 
-fn eating_system(mut hoppers: Query<(&Hopper, &Sepax)>, targets: Query<(&Grass, &Sepax)>) {
+fn eating_system(
+    mut commands: Commands,
+    mut hoppers: Query<(&Hopper, &Sepax)>,
+    targets: Query<(Entity, &Grass, &Sepax)>,
+) {
     for (_h, hs) in hoppers.iter() {
-        for (_g, gs) in targets.iter() {
+        for (ge, g, gs) in targets.iter() {
             if sat_overlap(hs.shape(), gs.shape()) {
-                println!("{:?}", "grasshopper hit!")
+                println!("{:?}", "grasshopper hit!");
+                commands.entity(ge).despawn();
             }
         }
+    }
+}
+
+fn hopper_movement_system(mut query: Query<(&Hopper, &mut Transform, &mut Sepax)>) {
+    for (_h, mut t, mut sepax) in query.iter_mut() {
+        if t.translation.x < -BOUNDS.x / 2. {
+            t.rotation = Quat::from_rotation_z(0.);
+        }
+
+        if t.translation.x > BOUNDS.x / 2. {
+            t.rotation = Quat::from_rotation_z(180.0_f32.to_radians());
+        }
+
+        if t.translation.y > BOUNDS.y / 2. {
+            t.rotation = Quat::from_rotation_z(270.0_f32.to_radians());
+        }
+
+        if t.translation.y < -BOUNDS.y / 2. {
+            t.rotation = Quat::from_rotation_z(90.0_f32.to_radians());
+        }
+
+        let movement_distance = 600. * TIME_STEP;
+        let translation_delta = t.rotation * Vec3::X * movement_distance;
+        t.translation += translation_delta;
+        sepax
+            .shape_mut()
+            .set_position((t.translation.x, t.translation.y))
     }
 }
