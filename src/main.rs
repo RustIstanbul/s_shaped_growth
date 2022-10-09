@@ -1,9 +1,14 @@
 //! Demonstrates rotating entities in 2D using quaternions.
 
-use bevy::{math::Vec3Swizzles, prelude::*, sprite::MaterialMesh2dBundle, time::FixedTimestep};
+use bevy::{
+    math::Vec3Swizzles,
+    prelude::*,
+    sprite::{MaterialMesh2dBundle, Mesh2dHandle},
+    time::FixedTimestep,
+};
 
 use rand::prelude::random;
-use std::time::Duration;
+use std::{f32::consts::PI, time::Duration};
 
 use bevy_sepax2d::prelude::*;
 use sepax2d::prelude::*;
@@ -30,7 +35,9 @@ fn main() {
 struct Grass {}
 
 #[derive(Component)]
-struct Hopper {}
+struct Hopper {
+    belly: f32,
+}
 
 struct GrassSpawnConfig {
     /// How often to spawn a new grass? (repeating timer)
@@ -57,27 +64,29 @@ fn setup(
 
     commands.insert_resource(GrassSpawnConfig {
         // create the repeating timer
-        timer: Timer::new(Duration::from_millis(100), true),
+        timer: Timer::new(Duration::from_millis(50), true),
     });
 
     let circle1 = Circle::new((0.0, 0.0), 10.0);
-
-    commands
-        .spawn_bundle(MaterialMesh2dBundle {
-            mesh: meshes.add(shape::Circle::new(10.).into()).into(),
-            material: materials.add(ColorMaterial::from(Color::RED)),
-            transform: Transform::from_translation(Vec3::new(
-                random::<f32>() * BOUNDS.x - BOUNDS.x / 2.,
-                random::<f32>() * BOUNDS.y - BOUNDS.y / 2.0,
-                0.,
-            ))
-            .with_rotation(Quat::from_rotation_z((20.0_f32).to_radians())),
-            ..default()
-        })
-        .insert(Hopper {})
-        .insert(Sepax {
-            convex: bevy_sepax2d::Convex::Circle(circle1),
-        });
+    for count in 0..1 {
+        let random_radian = (360.0_f32 * random::<f32>()).to_radians();
+        commands
+            .spawn_bundle(MaterialMesh2dBundle {
+                mesh: meshes.add(shape::Circle::new(10.).into()).into(),
+                material: materials.add(ColorMaterial::from(Color::RED)),
+                transform: Transform::from_translation(Vec3::new(
+                    random::<f32>() * BOUNDS.x - BOUNDS.x / 2.,
+                    random::<f32>() * BOUNDS.y - BOUNDS.y / 2.0,
+                    0.,
+                ))
+                .with_rotation(Quat::from_rotation_z(random_radian)),
+                ..default()
+            })
+            .insert(Hopper { belly: 50. })
+            .insert(Sepax {
+                convex: bevy_sepax2d::Convex::Circle(circle1),
+            });
+    }
 }
 
 fn spawn_grasses(
@@ -121,14 +130,58 @@ fn spawn_grasses(
 
 fn eating_system(
     mut commands: Commands,
-    mut hoppers: Query<(&Hopper, &Sepax)>,
+    mut hoppers: Query<(
+        &mut Hopper,
+        &Sepax,
+        &Handle<ColorMaterial>,
+        Entity,
+        &Transform,
+    )>,
     targets: Query<(Entity, &Grass, &Sepax)>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    for (_h, hs) in hoppers.iter() {
+    for (mut h, hs, colorh, hopper_entity, hopper_transform) in hoppers.iter_mut() {
         for (ge, g, gs) in targets.iter() {
             if sat_overlap(hs.shape(), gs.shape()) {
                 commands.entity(ge).despawn();
+                h.belly += 40.;
             }
+        }
+
+        h.belly -= 0.2;
+
+        if h.belly < 0. {
+            commands.entity(hopper_entity).despawn();
+        }
+
+        let pinkness = 1. - h.belly.min(100.) / 100.;
+        let some_color = &mut materials.get_mut(colorh).unwrap().color;
+        some_color.set_g(pinkness);
+        some_color.set_b(pinkness);
+
+        if h.belly > 100. {
+            for count in 0..2 {
+                let random_radian = (360.0_f32 * random::<f32>()).to_radians();
+                let circle1 = Circle::new((0.0, 0.0), 10.0);
+                commands
+                    .spawn_bundle(MaterialMesh2dBundle {
+                        mesh: meshes.add(shape::Circle::new(10.).into()).into(),
+                        material: materials.add(ColorMaterial::from(Color::RED)),
+                        transform: Transform::from_translation(Vec3::new(
+                            hopper_transform.translation.x,
+                            hopper_transform.translation.y,
+                            0.,
+                        ))
+                        .with_rotation(Quat::from_rotation_z(random_radian)),
+                        ..default()
+                    })
+                    .insert(Hopper { belly: 30. })
+                    .insert(Sepax {
+                        convex: bevy_sepax2d::Convex::Circle(circle1),
+                    });
+            }
+            h.belly -= 60.0;
         }
     }
 }
@@ -136,26 +189,56 @@ fn eating_system(
 fn hopper_movement_system(mut query: Query<(&Hopper, &mut Transform, &mut Sepax)>) {
     for (_h, mut t, mut sepax) in query.iter_mut() {
         if t.translation.x < -BOUNDS.x / 2. {
-            t.rotation = Quat::from_rotation_z(0.);
+            // t.rotation = Quat::from_rotation_z(0.);
+
+            // let r = PI - t.rotation.z;
+            // t.rotation = Quat::from_rotation_z(r);
+
+            let random_radian = (90.0 - 90.0_f32 * random::<f32>()).to_radians();
+            t.rotation = Quat::from_rotation_z(0. + random_radian);
         }
 
         if t.translation.x > BOUNDS.x / 2. {
-            t.rotation = Quat::from_rotation_z(180.0_f32.to_radians());
+            // t.rotation = Quat::from_rotation_z(180.0_f32.to_radians());
+
+            // let r = PI - t.rotation.z;
+            // t.rotation = Quat::from_rotation_z(r);
+
+            let random_radian = (90.0 - 90.0_f32 * random::<f32>()).to_radians();
+            t.rotation = Quat::from_rotation_z(PI + random_radian);
         }
 
         if t.translation.y > BOUNDS.y / 2. {
-            t.rotation = Quat::from_rotation_z(270.0_f32.to_radians());
+            // t.rotation = Quat::from_rotation_z(270.0_f32.to_radians());
+
+            // let r = -t.rotation.z;
+            // t.rotation = Quat::from_rotation_z(r);
+
+            let random_radian = (90.0 - 90.0_f32 * random::<f32>()).to_radians();
+            t.rotation = Quat::from_rotation_z(3.0 * PI / 2. + random_radian);
         }
 
         if t.translation.y < -BOUNDS.y / 2. {
             t.rotation = Quat::from_rotation_z(90.0_f32.to_radians());
+
+            // let r = -t.rotation.z;
+            // t.rotation = Quat::from_rotation_z(r);
+
+            let random_radian = (90.0 - 90.0_f32 * random::<f32>()).to_radians();
+            t.rotation = Quat::from_rotation_z(PI / 2. + random_radian);
         }
 
-        let movement_distance = 600. * TIME_STEP;
+        let movement_distance = 300. * TIME_STEP;
         let translation_delta = t.rotation * Vec3::X * movement_distance;
         t.translation += translation_delta;
         sepax
             .shape_mut()
-            .set_position((t.translation.x, t.translation.y))
+            .set_position((t.translation.x, t.translation.y));
+
+        let random_f32 = (120.0_f32 * random::<f32>());
+        if random_f32 < 1.0 {
+            let random_radian = (360.0_f32 * random::<f32>()).to_radians();
+            t.rotation = Quat::from_rotation_z(random_radian);
+        }
     }
 }
