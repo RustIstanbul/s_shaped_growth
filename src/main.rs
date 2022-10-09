@@ -207,7 +207,8 @@ fn count_hoppers(
                             0.,
                             - (count as f32) / 2. - 5.0,
                             0.,
-                        )),
+                        )).with_rotation(Quat::from_rotation_z(PI/4.0)),
+
                     ..default()
                 });
             });
