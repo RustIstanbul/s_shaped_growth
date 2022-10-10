@@ -1,4 +1,5 @@
 //cargo build --release --target wasm32-unknown-unknown
+// wasm-bindgen --out-dir ./out/ --target web ./target/wasm32-unknown-unknown/release/s_shaped_growth.wasm
 use bevy::{
     math::Vec3Swizzles,
     prelude::*,
@@ -14,6 +15,8 @@ use sepax2d::prelude::*;
 
 const TIME_STEP: f32 = 1.0 / 60.0;
 const BOUNDS: Vec2 = Vec2::new(1200.0, 640.0);
+
+const SPECIAL_THANKS: &str = "Friends";
 
 fn main() {
     App::new()
@@ -44,8 +47,6 @@ struct HopperCount {
     count: usize,
     step: usize,
 }
-
-struct UiFont(Handle<Font>);
 
 struct GrassSpawnConfig {
     /// How often to spawn a new grass? (repeating timer)
@@ -107,11 +108,33 @@ fn setup(
                 convex: bevy_sepax2d::Convex::Circle(circle1),
             });
     }
-}
 
-fn load_ui_font(mut commands: Commands, server: Res<AssetServer>) {
-    let handle: Handle<Font> = server.load("fonts/NotoSansMono-Regular.ttf");
-    commands.insert_resource(UiFont(handle));
+    let font = asset_server.load("fonts/NotoSansMono-Regular.ttf");
+    let text_style = TextStyle {
+        font: font,
+        font_size: 20.0,
+        color: Color::WHITE,
+    };
+    commands.spawn_bundle(Text2dBundle {
+        text: Text::from_section("Development: Fatih Pense", text_style.clone())
+            .with_alignment(TextAlignment::CENTER),
+        transform: Transform::from_translation(Vec3::new(
+            -BOUNDS.x / 2. + 120.,
+            BOUNDS.y / 2. - 5.0,
+            1.,
+        )),
+        ..default()
+    });
+
+    commands.spawn_bundle(Text2dBundle {
+        text: Text::from_section(
+            "Special Thanks: ".to_owned() + SPECIAL_THANKS,
+            text_style.clone(),
+        )
+        .with_alignment(TextAlignment::CENTER),
+        transform: Transform::from_translation(Vec3::new(0., BOUNDS.y / 2. - 5.0, 1.)),
+        ..default()
+    });
 }
 
 fn spawn_grasses(
@@ -165,9 +188,9 @@ fn count_hoppers(
     // tick the timer
     config.timer.tick(time.delta());
 
-    let font = asset_server.load("fonts/NotoSansMono-Regular.ttf");
-
     if config.timer.finished() {
+        let font = asset_server.load("fonts/NotoSansMono-Regular.ttf");
+
         let text_style = TextStyle {
             font: font,
             font_size: 15.0,
@@ -191,7 +214,7 @@ fn count_hoppers(
                 transform: Transform::from_translation(Vec3::new(
                     config.step as f32 * 20. - BOUNDS.x / 2.,
                     (count as f32) / 2. - BOUNDS.y / 2.0,
-                    0.,
+                    1.,
                 )),
                 ..default()
             })
@@ -203,11 +226,12 @@ fn count_hoppers(
                 parent.spawn_bundle(Text2dBundle {
                     text: Text::from_section(count.to_string(), text_style.clone())
                         .with_alignment(TextAlignment::CENTER),
-                        transform: Transform::from_translation(Vec3::new(
-                            0.,
-                            - (count as f32) / 2. - 5.0,
-                            0.,
-                        )).with_rotation(Quat::from_rotation_z(PI/4.0)),
+                    transform: Transform::from_translation(Vec3::new(
+                        0.,
+                        -(count as f32) / 2. - 5.0,
+                        0.,
+                    ))
+                    .with_rotation(Quat::from_rotation_z(PI / 4.0)),
 
                     ..default()
                 });
